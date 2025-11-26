@@ -3,9 +3,37 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 
-# --- CONFIGURACIÓN INICIAL ---
-st.set_page_config(page_title="Analizador Universal", layout="wide")
-st.title("📊 Analizador Estadístico: Archivo o Manual")
+# ==============================
+# CONFIGURACIÓN INICIAL
+# ==============================
+st.set_page_config(
+    page_title="Analizador Universal",
+    layout="wide",
+    page_icon="📊"  # 👈 Favicon añadido
+)
+
+# --- CSS PARA OCULTAR MENÚ, BOTÓN DEPLOY Y HEADER ---
+hide_menu_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    .stAppDeployButton {display:none;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """
+st.markdown(hide_menu_style, unsafe_allow_html=True)
+
+# ==============================
+# 0. TÍTULO CON REDIRECCIÓN
+# ==============================
+# Al dar clic en el título, redirige a la Landing Page
+st.markdown("""
+    <a href="https://69269a80bfaf4fe85248b98e--wondrous-sawine-993b24.netlify.app/" target="_self" style="text-decoration: none; color: inherit;">
+        <h1 style="margin-top: 0; padding-top: 0;">📊 Analizador Estadístico: Archivo o Manual</h1>
+    </a>
+    """, unsafe_allow_html=True)
+
+st.caption("👆 Haz clic en el título para volver a la página de inicio.")
 st.markdown("---")
 
 # ==============================
@@ -142,9 +170,16 @@ if df is not None and not df.empty:
         st.write("📌 **Medidas Estadísticas**")
         try:
             st.metric("Moda", str(datos.mode()[0]))
+            
             if es_numerico:
                 st.metric("Media", f"{datos.mean():.2f}")
                 st.metric("Mediana", f"{datos.median():.2f}")
+                
+                # --- AQUÍ ESTÁN LAS NUEVAS MÉTRICAS ---
+                st.metric("Rango", f"{datos.max() - datos.min()}")
+                st.metric("Desviación Estándar", f"{datos.std():.2f}")
+                # --------------------------------------
+
                 st.metric("Mínimo", f"{datos.min()}")
                 st.metric("Máximo", f"{datos.max()}")
         except:
@@ -205,7 +240,7 @@ else:
     st.info("👆 Esperando datos para procesar.")
 
 # =======================================================
-# 🔵 SECCIÓN INFORMATIVA — AGREGADA TAL COMO PEDISTE
+# 🔵 SECCIÓN INFORMATIVA 
 # =======================================================
 st.markdown("""
 ---
