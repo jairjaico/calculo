@@ -51,14 +51,11 @@ nombre_columna_analisis = "Datos"
 if opcion_fuente == "📂 Subir Archivo Excel/CSV":
     archivo = st.file_uploader("Sube tu archivo aquí:", type=["xlsx", "csv"])
     if archivo:
-        # --- LECTURA ROBUSTA DE CSV/EXCEL ---
         try:
             if archivo.name.endswith(".csv"):
-                # Intento 1: Autodetección inteligente
                 try:
                     df_temp = pd.read_csv(archivo, sep=None, engine='python')
                 except:
-                    # Intento 2: Forzar punto y coma (común en español)
                     archivo.seek(0)
                     df_temp = pd.read_csv(archivo, sep=';')
             else:
@@ -70,22 +67,16 @@ if opcion_fuente == "📂 Subir Archivo Excel/CSV":
         columna_seleccionada = st.selectbox("Selecciona la columna a analizar:", df_temp.columns)
         
         if columna_seleccionada:
-            # --- LIMPIEZA DE DATOS ---
-            # 1. Convertimos a string
             serie_sucia = df_temp[columna_seleccionada].astype(str)
-            # 2. Reemplazamos coma por punto (12,5 -> 12.5)
             serie_sucia = serie_sucia.str.replace(',', '.')
-            # 3. Convertimos a números, los errores se vuelven NaN
             datos_limpios = pd.to_numeric(serie_sucia, errors='coerce')
             
-            # 4. Creamos el DataFrame final eliminando vacíos
             df = pd.DataFrame(datos_limpios).dropna()
             nombre_columna_analisis = columna_seleccionada
             df.columns = [nombre_columna_analisis]
             
-            # Verificación de seguridad
             if df.empty:
-                st.warning("⚠️ La columna seleccionada no contiene números válidos después de limpiar. Intenta con otra columna.")
+                st.warning("⚠️ La columna no contiene números válidos.")
                 df = None
 
 else:
@@ -147,16 +138,14 @@ if df is not None and not df.empty:
         
         num_intervalos = st.slider("Número de intervalos (k):", 2, 30, k_sturges)
 
-        # Generación de histograma segura
         try:
             frecuencias, bordes = np.histogram(datos, bins=num_intervalos)
         except Exception as e:
-            st.error(f"Error calculando intervalos: {e}. Revisa tus datos.")
+            st.error(f"Error calculando intervalos: {e}")
             st.stop()
         
         amplitud_res = bordes[1] - bordes[0]
 
-        # Construcción de la tabla
         for i in range(len(frecuencias)):
             li, ls = bordes[i], bordes[i + 1]
             marca = (li + ls) / 2
@@ -176,20 +165,17 @@ if df is not None and not df.empty:
             })
 
         tabla = pd.DataFrame(tabla_calculo)
-        
         cols = ["Intervalo", "Marca Clase (xi)", "fi"]
         tabla_view = tabla[cols].copy() 
         col_grafico = "Marca Clase (xi)"
 
     else:
-        # Modo Simple
         tabla = datos.value_counts().reset_index()
         tabla.columns = ["Dato (xi)", "fi"]
         tabla = tabla.sort_values(by="Dato (xi)")
         col_grafico = "Dato (xi)"
         tabla_view = tabla.copy()
 
-    # Cálculos acumulados
     tabla["fi"] = tabla["fi"].astype(int)
     total = tabla["fi"].sum()
     tabla["hi"] = tabla["fi"] / total
@@ -221,13 +207,10 @@ if df is not None and not df.empty:
 
     if es_numerico:
         if modo_analisis == "Intervalos":
-            # --- FÓRMULAS PARA DATOS AGRUPADOS ---
-            
-            # 1. MEDIA PONDERADA
+            # --- DATOS AGRUPADOS ---
             tabla["xi_fi"] = tabla["Marca Clase (xi)"] * tabla["fi"]
             media_res = tabla["xi_fi"].sum() / n
             
-            # 2. MEDIANA (Interpolación)
             posicion_mediana = n / 2
             intervalo_mediana_df = tabla[tabla["Fi"] >= posicion_mediana]
             
@@ -242,10 +225,7 @@ if df is not None and not df.empty:
                     mediana_res = Li_med + ((posicion_mediana - Fi_ant) / fi_med) * amplitud_res
                 else:
                     mediana_res = Li_med
-            else:
-                mediana_res = 0
             
-            # 3. MODA (Interpolación)
             idx_moda = tabla["fi"].idxmax()
             row_moda = tabla.loc[idx_moda]
             fi_modal = row_moda["fi"]
@@ -262,19 +242,15 @@ if df is not None and not df.empty:
             else:
                 moda_res = Li_mod + (d1 / (d1 + d2)) * amplitud_res
 
-            # 4. RANGO
             rango_res = max_res - min_res
 
-            # 5. DESVIACIÓN ESTÁNDAR AGRUPADA
             tabla["distancia_cuadrada"] = tabla["fi"] * ((tabla["Marca Clase (xi)"] - media_res) ** 2)
             if n > 1:
                 varianza = tabla["distancia_cuadrada"].sum() / (n - 1)
                 std_res = math.sqrt(varianza)
-            else:
-                std_res = 0
 
         else:
-            # --- FÓRMULAS DATOS SIMPLES ---
+            # --- DATOS SIMPLES ---
             media_res = datos.mean()
             mediana_res = datos.median()
             try:
@@ -286,10 +262,8 @@ if df is not None and not df.empty:
 
     col_medidas, col_graficos = st.columns([1, 3])
 
-    # --- MOSTRAR MEDIDAS ---
     with col_medidas:
         st.write("📌 **Medidas Estadísticas**")
-        
         if modo_analisis == "Intervalos":
             st.success("Cálculo: Datos Agrupados")
         else:
@@ -300,13 +274,10 @@ if df is not None and not df.empty:
                 st.metric("Media", f"{media_res:.4f}")
                 st.metric("Mediana", f"{mediana_res:.4f}")
                 st.metric("Moda", f"{moda_res:.4f}")
-                
                 if modo_analisis == "Intervalos":
                     st.metric("Amplitud (A)", f"{amplitud_res:.4f}")
-                
                 st.metric("Rango", f"{rango_res:.4f}")
                 st.metric("Desviación Estándar", f"{std_res:.4f}")
-                
                 st.markdown("---")
                 st.metric("Mínimo", f"{min_res}")
                 st.metric("Máximo", f"{max_res}")
@@ -314,44 +285,31 @@ if df is not None and not df.empty:
                 try:
                     st.metric("Moda", str(datos.mode()[0]))
                 except:
-                    st.warning("No hay moda clara")
-        except Exception as e:
-            st.warning(f"Error en cálculo: {e}")
+                    pass
+        except:
+            pass
 
-    # --- GRÁFICOS ---
     with col_graficos:
-        tab_bar, tab_pie, tab_ojiva = st.tabs(["📊 Barras / Histograma", "🥧 Circular", "📈 Ojiva"])
+        tab_bar, tab_pie, tab_ojiva, tab_cajas = st.tabs(["📊 Barras", "🥧 Circular", "📈 Ojiva", "📦 Diagrama Cajas"])
 
         with tab_bar:
             fig1 = go.Figure()
             fig1.add_trace(go.Bar(
-                x=tabla_view[col_grafico],
-                y=tabla_view["fi"],
-                text=tabla_view["fi"],
-                textposition="outside",
-                marker_color="#1f77b4",
-                name="Frecuencia"
+                x=tabla_view[col_grafico], y=tabla_view["fi"],
+                text=tabla_view["fi"], textposition="outside",
+                marker_color="#1f77b4", name="Frecuencia"
             ))
-
             if modo_analisis == "Intervalos":
                 fig1.add_trace(go.Scatter(
-                    x=tabla_view[col_grafico],
-                    y=tabla_view["fi"],
-                    mode="lines+markers",
-                    line=dict(color="red"),
-                    name="Polígono"
+                    x=tabla_view[col_grafico], y=tabla_view["fi"],
+                    mode="lines+markers", line=dict(color="red"), name="Polígono"
                 ))
-                fig1.update_layout(title=f"Histograma (Amplitud ≈ {amplitud_res:.2f})", height=500)
-            else:
-                fig1.update_layout(title="Gráfico de Barras", height=500)
-            
+            fig1.update_layout(title="Histograma / Barras", height=500)
             st.plotly_chart(fig1, use_container_width=True)
 
         with tab_pie:
             fig2 = go.Figure(data=[go.Pie(
-                labels=tabla_view[col_grafico],
-                values=tabla_view["fi"],
-                hole=0.3
+                labels=tabla_view[col_grafico], values=tabla_view["fi"], hole=0.3
             )])
             fig2.update_layout(title="Distribución porcentual")
             st.plotly_chart(fig2, use_container_width=True)
@@ -359,21 +317,56 @@ if df is not None and not df.empty:
         with tab_ojiva:
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(
-                x=tabla_view[col_grafico],
-                y=tabla_view["Fi"],
-                mode="lines+markers",
-                fill="tozeroy",
-                name="Ojiva"
+                x=tabla_view[col_grafico], y=tabla_view["Fi"],
+                mode="lines+markers", fill="tozeroy", name="Ojiva"
             ))
             fig3.update_layout(title="Ojiva (Frecuencia Acumulada)")
             st.plotly_chart(fig3, use_container_width=True)
+            
+        # --- DIAGRAMA DE CAJAS MANUAL ---
+        with tab_cajas:
+            if es_numerico:
+                # 1. Calculamos los cuartiles EXACTOS usando numpy
+                # 'linear' es el método estándar de Python/Excel
+                q1 = np.percentile(datos, 25)
+                mediana_caja = np.percentile(datos, 50)
+                q3 = np.percentile(datos, 75)
+                
+                # 2. Calculamos bigotes (Tukey)
+                iqr = q3 - q1
+                bigote_inf = q1 - 1.5 * iqr
+                bigote_sup = q3 + 1.5 * iqr
+                
+                # Filtramos para encontrar el dato real más cercano dentro del rango del bigote
+                datos_dentro = datos[(datos >= bigote_inf) & (datos <= bigote_sup)]
+                lower_fence = datos_dentro.min() if not datos_dentro.empty else q1
+                upper_fence = datos_dentro.max() if not datos_dentro.empty else q3
+
+                fig4 = go.Figure()
+                fig4.add_trace(go.Box(
+                    y=datos,
+                    name="Distribución",
+                    marker_color='#1f77b4',
+                    boxpoints='all', # Muestra puntos individuales
+                    jitter=0.3,
+                    pointpos=-1.8,
+                    # FORZAMOS LOS VALORES CALCULADOS:
+                    q1=[q1], 
+                    median=[mediana_caja], 
+                    q3=[q3],
+                    lowerfence=[lower_fence],
+                    upperfence=[upper_fence]
+                ))
+                fig4.update_layout(
+                    title="Diagrama de Cajas (Cálculo Exacto)",
+                    height=500
+                )
+                st.plotly_chart(fig4, use_container_width=True)
+                
+                # Mostramos los valores calculados para verificación
+                st.info(f"**Valores calculados:** Q1={q1:.2f} | Mediana={mediana_caja:.2f} | Q3={q3:.2f}")
+            else:
+                st.info("El diagrama de cajas solo aplica a datos numéricos.")
 
 else:
     st.info("👆 Esperando datos para procesar.")
-
-st.markdown("""
----
-## 📘 Notas
-- **Soporte CSV:** El sistema ahora detecta automáticamente si tu archivo usa comas (`,`) o punto y coma (`;`).
-- **Limpieza:** Se corrigen automáticamente los decimales (ej: `12,5` a `12.5`).
-""")
